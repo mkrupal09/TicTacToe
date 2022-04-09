@@ -19,6 +19,7 @@ import android.view.*
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import java.util.*
 
@@ -28,19 +29,59 @@ class MyAccessibilityService : AccessibilityService() {
 
     var doNotListen: Boolean = false
     var handler = Handler()
+
+    lateinit var disableView: View
+    lateinit var childView:View
     override fun onServiceConnected() {
         super.onServiceConnected()
         this.serviceInfo = serviceInfo.apply {
             eventTypes =
-                AccessibilityEvent.TYPE_VIEW_CLICKED or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                AccessibilityEvent.TYPE_VIEW_CLICKED or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
             packageNames = arrayOf("com.android.systemui")
             feedbackType = AccessibilityServiceInfo.FEEDBACK_VISUAL
-            notificationTimeout = 100
+            notificationTimeout = 800
 
         }
 
+        createMyView()
 
         Log.e("MyAccess", "On")
+    }
+
+    fun createMyView() {
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        val mLayout = FrameLayout(this)
+        mLayout.setBackgroundColor(Color.TRANSPARENT)
+
+        val lp = WindowManager.LayoutParams()
+        lp.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        lp.format = PixelFormat.TRANSLUCENT
+        lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        lp.width = WindowManager.LayoutParams.WRAP_CONTENT
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT
+        lp.gravity = Gravity.LEFT or Gravity.TOP
+
+        val inflater = LayoutInflater.from(this)
+        childView=inflater.inflate(R.layout.layout_bar, mLayout)
+
+        wm.addView(mLayout, lp)
+
+        disableView = mLayout
+
+        mLayout.setOnClickListener {
+            Log.e("MeClicked", "true")
+            Toast.makeText(this@MyAccessibilityService, "Me Clicked", Toast.LENGTH_SHORT).show()
+            handler.post {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+
+                handler.postDelayed({
+                    openActivity()
+                    removeView()
+                }, 1000)
+            }
+        }
+
+        disableView.visibility=View.GONE
     }
 
 
@@ -168,36 +209,37 @@ class MyAccessibilityService : AccessibilityService() {
 
     }
 
-    private val list = arrayListOf<View>()
     private fun addMyView(node: AccessibilityNodeInfo) {
 
-        /*for (i in list) {
-
-        }*/
-
-        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        val mLayout = FrameLayout(this)
-        mLayout.setBackgroundColor(Color.TRANSPARENT)
-        val lp = WindowManager.LayoutParams()
-        lp.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-        lp.format = PixelFormat.TRANSLUCENT
-        lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-        lp.width = WindowManager.LayoutParams.WRAP_CONTENT
-        lp.height = WindowManager.LayoutParams.WRAP_CONTENT
-        lp.gravity = Gravity.LEFT or Gravity.TOP
-
-
+        /*val node = node.parent // comment for mi*/
         val rect = Rect()
         node.getBoundsInScreen(rect)
 
-        lp.x = rect.left
-        lp.y = rect.top
+
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+
+       val params= (disableView.layoutParams as WindowManager.LayoutParams).also { lp ->
+            lp.x = rect.left
+            lp.y = (rect.top )
+
+            lp.width = rect.width()
+            lp.height = rect.height()
+        }
+
+        wm.updateViewLayout(disableView,params)
+      /*  childView.layoutParams= (disableView.layoutParams as ViewGroup.LayoutParams).also { lp ->
+
+
+            lp.width = rect.width()
+            lp.height = rect.height()
+        }
+
+        childView.x = rect.left.toFloat()
+        childView.y = (rect.top + (rect.height() / 2)).toFloat()*/
 
         /*lp.x = 40
         lp.y = 400*/
 
-        val inflater = LayoutInflater.from(this)
-        inflater.inflate(R.layout.layout_bar, mLayout)
 
         /*node.window.getBoundsInScreen(rect)*/
         /*mLayout.x = 20.0f
@@ -207,35 +249,19 @@ class MyAccessibilityService : AccessibilityService() {
 
         }*/
 
-        /*mLayout.setOnClickListener {
-            Log.e("MeClicked", "true")
-            Toast.makeText(this@MyAccessibilityService, "Me Clicked", Toast.LENGTH_SHORT).show()
-            handler.post {
-                performGlobalAction(GLOBAL_ACTION_HOME)
 
-                handler.postDelayed({
-                    openActivity()
-                    wm.removeView(mLayout)
-                }, 1000)
-            }
-        }*/
         /* mLayout.setOnTouchListener { view, motionEvent ->
              return@setOnTouchListener false
          }*/
 
 
         /*removeView()*/
-
-        wm.addView(mLayout, lp)
-        list.add(mLayout)
+        disableView.visibility = View.VISIBLE
     }
 
     private fun removeView() {
-        for (i in list) {
-            val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-            wm.removeView(i)
-        }
-        list.clear()
+
+        disableView.visibility = View.GONE
     }
 
     private fun killLauncher() {
