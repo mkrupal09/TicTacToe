@@ -36,6 +36,8 @@ class MainActivity : AppCompatActivity() {
 
         val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
         startActivity(intent)
+
+        startService(Intent(this, MyForegroundService::class.java))
     }
 
     private val clickListener = View.OnClickListener {
@@ -64,7 +66,7 @@ class MainActivity : AppCompatActivity() {
              }
          }*/
 
-        checkWinning()
+        /*checkWinning()*/
 
         userTurn = !userTurn
 
@@ -91,8 +93,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkWinning()
-    {
-
-    }
 }
