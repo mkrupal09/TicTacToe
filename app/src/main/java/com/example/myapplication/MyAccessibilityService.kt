@@ -15,13 +15,18 @@ import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.util.Log
-import android.view.*
+import android.view.Gravity
+import android.view.KeyEvent
+import android.view.LayoutInflater
+import android.view.View
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import java.util.*
+import java.util.SortedMap
+import java.util.TreeMap
 
 
 class MyAccessibilityService : AccessibilityService() {
@@ -31,7 +36,7 @@ class MyAccessibilityService : AccessibilityService() {
     var handler = Handler()
 
     lateinit var disableView: View
-    lateinit var childView:View
+    lateinit var childView: View
     override fun onServiceConnected() {
         super.onServiceConnected()
         this.serviceInfo = serviceInfo.apply {
@@ -39,16 +44,14 @@ class MyAccessibilityService : AccessibilityService() {
                 AccessibilityEvent.TYPE_VIEW_CLICKED or AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
             packageNames = arrayOf("com.android.systemui")
             feedbackType = AccessibilityServiceInfo.FEEDBACK_VISUAL
-            notificationTimeout = 800
+            notificationTimeout = 300
 
         }
 
         createMyView()
-
-        Log.e("MyAccess", "On")
     }
 
-    fun createMyView() {
+    private fun createMyView() {
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val mLayout = FrameLayout(this)
         mLayout.setBackgroundColor(Color.TRANSPARENT)
@@ -62,7 +65,7 @@ class MyAccessibilityService : AccessibilityService() {
         lp.gravity = Gravity.LEFT or Gravity.TOP
 
         val inflater = LayoutInflater.from(this)
-        childView=inflater.inflate(R.layout.layout_bar, mLayout)
+        childView = inflater.inflate(R.layout.layout_bar, mLayout)
 
         wm.addView(mLayout, lp)
 
@@ -81,7 +84,7 @@ class MyAccessibilityService : AccessibilityService() {
             }
         }
 
-        disableView.visibility=View.GONE
+        disableView.visibility = View.GONE
     }
 
 
@@ -97,10 +100,10 @@ class MyAccessibilityService : AccessibilityService() {
         /*recursiveLoopChildrenX(rootInActiveWindow)*/
 
         if (event?.source?.packageName != null && event.source.packageName == "com.android.systemui") {
-            if (event != null) {
-                if (event.source != null) {
-                    makeChildInacessible(event.source!!)
-                    /*observeEvent(event)*/
+            if (event.source != null) {
+                makeChildInAcessible(event.source!!)
+                if (isFound.not()) {
+                    removeView()
                 }
             }
         } else {
@@ -152,7 +155,7 @@ class MyAccessibilityService : AccessibilityService() {
                         })
 
                 }, 500)*/
-                addMyView(event.source)
+                updateViewPosition(event.source)
             }
         }
     }
@@ -209,53 +212,22 @@ class MyAccessibilityService : AccessibilityService() {
 
     }
 
-    private fun addMyView(node: AccessibilityNodeInfo) {
-
+    private fun updateViewPosition(node: AccessibilityNodeInfo) {
         /*val node = node.parent // comment for mi*/
         val rect = Rect()
         node.getBoundsInScreen(rect)
 
-
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
 
-       val params= (disableView.layoutParams as WindowManager.LayoutParams).also { lp ->
+        val params = (disableView.layoutParams as WindowManager.LayoutParams).also { lp ->
             lp.x = rect.left
-            lp.y = (rect.top )
+            lp.y = (rect.top)
 
             lp.width = rect.width()
             lp.height = rect.height()
         }
 
-        wm.updateViewLayout(disableView,params)
-      /*  childView.layoutParams= (disableView.layoutParams as ViewGroup.LayoutParams).also { lp ->
-
-
-            lp.width = rect.width()
-            lp.height = rect.height()
-        }
-
-        childView.x = rect.left.toFloat()
-        childView.y = (rect.top + (rect.height() / 2)).toFloat()*/
-
-        /*lp.x = 40
-        lp.y = 400*/
-
-
-        /*node.window.getBoundsInScreen(rect)*/
-        /*mLayout.x = 20.0f
-        mLayout.y = 500.0f*/
-
-        /*mLayout.post {
-
-        }*/
-
-
-        /* mLayout.setOnTouchListener { view, motionEvent ->
-             return@setOnTouchListener false
-         }*/
-
-
-        /*removeView()*/
+        wm.updateViewLayout(disableView, params)
         disableView.visibility = View.VISIBLE
     }
 
@@ -271,51 +243,44 @@ class MyAccessibilityService : AccessibilityService() {
     }
 
 
+    private var isFound = false
+
     //For mi devices
     @SuppressLint("SoonBlockedPrivateApi")
-    private fun makeChildInacessible(
-        parent: AccessibilityNodeInfo
-    ) {
-
+    private fun makeChildInAcessible(parent: AccessibilityNodeInfo) {
 
         if (parent.packageName != null && parent.packageName == "com.android.systemui")
             for (i in 0 until parent.childCount) {
                 val child: AccessibilityNodeInfo? = parent.getChild(i)
                 if (child?.childCount ?: 0 > 0) {
-                    makeChildInacessible(child!!)
+                    makeChildInAcessible(child!!)
                 } else {
                     if (child != null) {
+
                         val name = child.viewIdResourceName
+
                         val contentDes = child.contentDescription
                         val text = child.text
 
                         if (contentDes.isNullOrEmpty().not() && contentDes.toString().lowercase()
-                                .contains("ultra") || (text.isNullOrEmpty()
-                                .not() && text.toString().lowercase().contains("ultra")
+                                .contains("location") || (text.isNullOrEmpty()
+                                .not() && text.toString().lowercase().contains("location")
                                     )
                         ) {
-
-
-                            /* Log.e("MyAccessCordinates",rect.toShortString())*/
-
-                            addMyView(child)
-
-                            /*  child.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK)
-                              child.parent.removeAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK)*/
-                            /*addMyView()*/
+                            isFound = true
+                            updateViewPosition(child)
+                        } else {
+                            isFound = true
                         }
                         Log.e("MyAccessName", name ?: "x")
                         Log.e("MyAccessDes", (contentDes ?: "y").toString())
                         Log.e("MyAccessText", (text ?: "z").toString())
+
                     }
                 }
             }
-        /*  if (isMeet.not()) {
-              removeView()
-          }*/
 
     }
-
 
     private fun openActivity() {
         startActivity(
